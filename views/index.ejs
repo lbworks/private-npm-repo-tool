@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>npm私库维护工具</title>
+  <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
+
+  <script src="/node_modules/jquery/dist/jquery.min.js"></script>
+  <script src="/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/node_modules/axios/dist/axios.min.js"></script>
+  <script src="/node_modules/vue/dist/vue.min.js"></script>
+</head>
+
+<body>
+  <div id="app">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <a class="navbar-brand" href="#">npm私库维护工具</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+        </ul>
+      </div>
+    </nav>
+
+    <div class="card">
+      <div class="card-body">
+        <ul class="nav nav-tabs" style="margin-bottom: 16px; cursor: pointer;">
+          <li class="nav-item" @click="tab = 'settings'">
+            <a class="nav-link" :class="{ 'active': tab === 'settings' }">项目管理</a>
+          </li>
+          <li class="nav-item" @click="tab = 'npm-install'">
+            <a class="nav-link" :class="{ 'active': tab === 'npm-install' }">npm install</a>
+          </li>
+          <li class="nav-item" @click="tab = 'download'">
+            <a class="nav-link" :class="{ 'active': tab === 'download' }">下载</a>
+          </li>
+        </ul>
+
+        <div v-show="tab === 'settings'">
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" @click="showEditor('')">添加</button>
+          <div class="list-group">
+            <button v-for="(project, index) in settingsPanel.projects" :key="index" type="button"
+              class="list-group-item list-group-item-action" @click="showEditor(project)">{{ project }}</button>
+          </div>
+        </div>
+
+        <div v-show="tab === 'npm-install'">
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" :disabled="npmInstallPanel.loading" @click="actionNpmInstall">执行 npm install</button>
+          <div class="card card-body" style="height: 500px; overflow: scroll;">
+            <div v-html="npmInstallPanel.content" id="resultMonitor"></div>
+            <div class="spinner-border text-primary" role="status" v-if="npmInstallPanel.loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-show="tab === 'download'">
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" @click="loadDownloadFileList">刷新</button>
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" :disabled="downloadPanel.loading" @click="genDownloadFile">生成tar包</button>
+          <div class="list-group">
+            <button v-for="(file, index) in downloadPanel.files" :key="index" type="button"
+              class="list-group-item list-group-item-action" @click="gotoFile(file)">{{ file }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 项目编辑器 -->
+    <div id="editorModal" class="modal fade">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              项目编辑器
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form>
+              <div class="form-group">
+                <label for="name">项目名</label>
+                <input class="form-control" id="name" v-model="editorModal.name"
+                  :readonly="editorModal.mode === 'edit'">
+              </div>
+              <div class="form-group">
+                <label for="packagejson">package.json</label>
+                <textarea class="form-control" id="txtPackageJson" v-model="editorModal.packagejson" rows="20"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="txtPackageLockJson">package-lock.json</label>
+                <textarea class="form-control" id="txtPackageLockJson" v-model="editorModal.packagelockjson" rows="20"></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer justify-content-between">
+            <div>
+              <button type="button" class="btn btn-danger" @click="deleteProject">删除项目</button>
+            </div>
+            <div>
+              <button type="button" class="btn btn-secondary" @click="closeEditor">关闭</button>
+              <button type="button" class="btn btn-primary" @click="save">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 执行 npm install -->
+    <div id="actionNpmInstallModal" class="modal fade">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              执行 npm install
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form>
+              <div class="form-group">
+                <label for="name">选择项目</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="checkall" v-model="allChecked">
+                  <label class="form-check-label" for="checkall">全选</label>
+                </div>
+                <div class="form-check" v-for="(project, index) in actionNpmInstallModal.projects" :key="index">
+                  <input class="form-check-input" type="checkbox" :id="'chk'+project.name" v-model="project.checked">
+                  <label class="form-check-label" :for="'chk'+project.name">{{ project.name }}</label>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeActionNpmInstall">关闭</button>
+            <button type="button" class="btn btn-primary" @click="doActionNpmInstall" :disabled="projectsChecked">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          tab: 'settings',
+          settingsPanel: {
+            projects: []
+          },
+          npmInstallPanel: {
+            content: '',
+            loading: false,
+            taskId: ''
+          },
+          downloadPanel: {
+            files: [],
+            loading: false
+          },
+          editorModal: {
+            mode: 'add',
+            name: '',
+            packagejson: '',
+            packagelockjson: ''
+          },
+          actionNpmInstallModal: {
+            projects: []
+          }
+        };
+      },
+      methods: {
+        loadProjects() {
+          axios.get(`/api/projects`)
+            .then(response => {
+              let projects = response.data.projects;
+              this.settingsPanel.projects = projects;
+            })
+            .catch(error => {
+              console.log(error);
+            });
+        },
+        loadResult(id) {
+          this.npmInstallPanel.loading = true;
+          axios.get(`/api/tasks/${id}`)
+            .then(response => {
+              let content = response.data.content;
+              content = content.replace(/\n/g, '<br>');
+              this.npmInstallPanel.content = content;
+              this.$nextTick(() => {
+                const container = this.$el.querySelector("#resultMonitor");
+                container.parentElement.scrollTop = container.scrollHeight;
+              });
+              if (!/TASK DONE\.<br>$/.test(content)) {
+                setTimeout(() => {
+                  this.loadResult(id);
+                }, 1000);
+              } else {
+                this.npmInstallPanel.loading = false;
+              }
+            })
+            .catch(error => {
+              console.log(error);
+            });
+        },
+        showEditor(name) {
+          $('#editorModal').modal('show');
+          this.editorModal.mode = name === '' ? 'add' : 'edit';
+          this.editorModal.name = '';
+          this.editorModal.packagejson = '';
+          this.editorModal.packagelockjson = '';
+
+          this.editorModal.name = name;
+          if (name !== '') {
+            axios.get(`/api/projects/${name}`)
+              .then(response => {
+                this.editorModal.packagejson = response.data.packagejson;
+                this.editorModal.packagelockjson = response.data.packagelockjson;
+              })
+              .catch(error => {
+                console.log(error);
+              });
+          }
+        },
+        closeEditor() {
+          $('#editorModal').modal('hide');
+        },
+        save() {
+          const name = this.editorModal.name;
+          axios.post(`/api/projects/${name}`, {
+            packagejson: this.editorModal.packagejson,
+            packagelockjson: this.editorModal.packagelockjson
+          })
+            .then(response => {
+              this.closeEditor();
+              this.loadProjects();
+            })
+            .catch(error => {
+              console.log(error);
+            });
+        },
+        deleteProject() {
+          let r = confirm('确认删除吗？删除后将不可恢复！');
+          if (r) {
+            const name = this.editorModal.name;
+            axios.delete(`/api/projects/${name}`)
+            .then(response => {
+              this.closeEditor();
+              this.loadProjects();
+            })
+            .catch(error => {
+              console.log(error);
+            });
+          }
+        },
+        actionNpmInstall() {
+          $('#actionNpmInstallModal').modal('show');
+          axios.get(`/api/projects`)
+            .then(response => {
+              let projects = response.data.projects.map(item => {
+                return {
+                  name: item,
+                  checked: false
+                };
+              });
+              this.actionNpmInstallModal.projects = projects;
+            })
+            .catch(error => {
+              console.log(error);
+            });
+        },
+        closeActionNpmInstall() {
+          $('#actionNpmInstallModal').modal('hide');
+        },
+        doActionNpmInstall() {
+          let actionProjects = this.actionNpmInstallModal.projects
+            .filter(item => item.checked === true)
+            .map(item => item.name);
+          console.log(actionProjects);
+          axios.post(`/api/start_tasks`, {
+            projects: actionProjects
+          }).then(response => {
+            let id = response.data.id;
+            this.taskId = id;
+            this.loadResult(this.taskId);
+            this.closeActionNpmInstall();
+          })
+          .catch(error => {
+            console.log(error);
+          });
+        },
+        genDownloadFile() {
+          this.downloadPanel.loading = true;
+          axios.post(`/api/genStorageTarball`)
+            .then(response => {
+              this.downloadPanel.loading = false;
+              this.loadDownloadFileList();
+            })
+            .catch(error => {
+              console.log(error);
+              this.downloadPanel.loading = false;
+            });
+        },
+        loadDownloadFileList() {
+          axios.get(`/api/listStorageTarball`)
+            .then(response => {
+              let files = response.data.files;
+              this.downloadPanel.files = files;
+            })
+            .catch(error => {
+              console.log(error);
+            });
+        },
+        gotoFile(file) {
+          window.open(`/public/files/${file}`);
+        }
+      },
+      mounted() {
+        this.loadProjects();
+        this.loadDownloadFileList();
+      },
+      computed: {
+        allChecked: {
+          get() {
+            return (this.actionNpmInstallModal.projects.findIndex(item => item.checked === false) === -1);
+          },
+          set(newValue) {
+            this.actionNpmInstallModal.projects.forEach(item => {
+              item.checked = newValue;
+            });
+          }
+        },
+        projectsChecked() {
+          return (this.actionNpmInstallModal.projects.findIndex(item => item.checked === true) === -1);
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
