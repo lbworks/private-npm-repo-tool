@@ -1,13 +1,13 @@
 {
-  "name": "verdaccio-tool",
-  "version": "1.0.0",
+  "name": "private-npm-repo-tool",
+  "version": "0.2",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node ./index.js"
   },
-  "author": "baiziyu <baiziyu@inspur.com>",
-  "license": "ISC",
+  "author": "bai_ziyu <bai_ziyu@outlook.com>",
+  "license": "Apache-2.0",
   "dependencies": {
     "axios": "^0.21.1",
     "bootstrap": "^4.6.0",
