@@ -115,6 +115,17 @@ app.post('/api/start_tasks', (req, res, next) => {
   });
 });
 
+app.post('/api/start_global_deps', (req, res, next) => {
+  let id = uuid.v4();
+  setTimeout(() => {
+    fs.writeFileSync(__dirname + `/resources/tasks/${id}.log`, '');
+    startGlobalDesp(id);
+  }, 0);
+  res.json({
+    id: id
+  });
+});
+
 app.post('/api/all_tasks', (req, res, next) => {
   let id = uuid.v4();
   setTimeout(() => {
@@ -124,6 +135,24 @@ app.post('/api/all_tasks', (req, res, next) => {
   res.json({
     id: id
   });
+});
+
+app.get('/api/global-deps', (req, res, next) => {
+  const globalDepsPath = __dirname + `/resources/global-deps`;
+  if (!fs.existsSync(globalDepsPath)) {
+    fs.writeFileSync(globalDepsPath, '');
+  }
+  let content = fs.readFileSync(globalDepsPath, 'utf-8');
+  res.json({
+    content: content
+  });
+});
+
+app.post('/api/global-deps', (req, res, next) => {
+  const globalDepsPath = __dirname + `/resources/global-deps`;
+  let content = req.body.content;
+  fs.writeFileSync(globalDepsPath, content);
+  res.json({});
 });
 
 app.get('/api/tasks/:id', (req, res, next) => {
@@ -141,17 +170,24 @@ app.get('/api/tasks/:id', (req, res, next) => {
 });
 
 app.post('/api/genStorageTarball', async (req, res, next) => {
-  const conn = await ssh.connect({
-    host: process.env.VERDACCIO_SERVER_HOSTNAME,
-    username: process.env.VERDACCIO_SERVER_USERNAME,
-    password: process.env.VERDACCIO_SERVER_PASSWORD
-  });
-  let date = moment().local().format('YYYYMMDD-HHmmss');
-  let filename = `storage-${date}.tar`;
-  await ssh.execCommand(`cd /var/lib/verdaccio && tar -cvf /root/${filename} ./storage`);
-  await ssh.getFile(__dirname + `/public/files/${filename}`, `/root/${filename}`);
-  await ssh.execCommand(`rm -f /root/${filename}`);
-  res.json({});
+  try {
+    const conn = await ssh.connect({
+      host: process.env.VERDACCIO_SERVER_HOSTNAME,
+      username: process.env.VERDACCIO_SERVER_USERNAME,
+      password: process.env.VERDACCIO_SERVER_PASSWORD,
+      forceIPv4: true
+    });
+    let date = moment().local().format('YYYYMMDD-HHmmss');
+    let filename = `storage-${date}.tar`;
+    await ssh.execCommand(`cd /var/lib/verdaccio && tar -cvf /root/${filename} ./storage`);
+    await ssh.getFile(__dirname + `/public/files/${filename}`, `/root/${filename}`);
+    await ssh.execCommand(`rm -f /root/${filename}`);
+    res.json({});  
+  } catch (e) {
+    res.json({
+      error: e
+    });
+  }
 });
 
 app.get('/api/listStorageTarball', (req, res, next) => {
@@ -168,6 +204,10 @@ function startTasks(id, projects) {
 
 function startAllTasks(id) {
   exec(`nohup ./scripts/start_all_tasks.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log &`);
+}
+
+function startGlobalDesp(id) {
+  exec(`nohup ./scripts/start_global_deps.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log &`);
 }
 
 server.listen(port, '0.0.0.0', () => {

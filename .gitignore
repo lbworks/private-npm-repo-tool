@@ -1,3 +1,3 @@
 node_modules/
-resources/projects/*
-resources/tasks/*
+public/files/*
+resources/*

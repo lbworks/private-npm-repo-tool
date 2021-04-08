@@ -44,27 +44,36 @@
     <div class="card">
       <div class="card-body">
         <ul class="nav nav-tabs" style="margin-bottom: 16px; cursor: pointer;">
-          <li class="nav-item" @click="tab = 'settings'">
-            <a class="nav-link" :class="{ 'active': tab === 'settings' }">项目管理</a>
+          <li class="nav-item" @click="tab = 'projects'">
+            <a class="nav-link" :class="{ 'active': tab === 'projects' }">项目管理</a>
+          </li>
+          <li class="nav-item" @click="tab = 'global-deps'">
+            <a class="nav-link" :class="{ 'active': tab === 'global-deps' }">全局依赖管理</a>
           </li>
           <li class="nav-item" @click="tab = 'npm-install'">
             <a class="nav-link" :class="{ 'active': tab === 'npm-install' }">npm install</a>
           </li>
           <li class="nav-item" @click="tab = 'download'">
-            <a class="nav-link" :class="{ 'active': tab === 'download' }">下载</a>
+            <a class="nav-link" :class="{ 'active': tab === 'download' }">生成和下载</a>
           </li>
         </ul>
 
-        <div v-show="tab === 'settings'">
-          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" @click="showEditor('')">添加</button>
+        <div v-show="tab === 'projects'">
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" @click="showProjectEditor('')">添加</button>
           <div class="list-group">
             <button v-for="(project, index) in settingsPanel.projects" :key="index" type="button"
-              class="list-group-item list-group-item-action" @click="showEditor(project)">{{ project }}</button>
+              class="list-group-item list-group-item-action" @click="showProjectEditor(project)">{{ project }}</button>
           </div>
+        </div>
+
+        <div v-show="tab === 'global-deps'">
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;":disabled="globalDepsPanel.saving" @click="saveGlobalDeps()">保存</button>
+          <textarea class="form-control" v-model="globalDepsPanel.content" rows="20"></textarea>
         </div>
 
         <div v-show="tab === 'npm-install'">
           <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" :disabled="npmInstallPanel.loading" @click="actionNpmInstall">执行 npm install</button>
+          <button type="button" class="btn btn-primary" style="margin-bottom: 16px;" :disabled="npmInstallPanel.loading" @click="actionGlobalDeps">执行全局依赖安装</button>
           <div class="card card-body" style="height: 500px; overflow: scroll;">
             <div v-html="npmInstallPanel.content" id="resultMonitor"></div>
             <div class="spinner-border text-primary" role="status" v-if="npmInstallPanel.loading">
@@ -168,9 +177,13 @@
       el: '#app',
       data() {
         return {
-          tab: 'settings',
+          tab: 'projects',
           settingsPanel: {
             projects: []
+          },
+          globalDepsPanel: {
+            content: '',
+            saving: false
           },
           npmInstallPanel: {
             content: '',
@@ -226,7 +239,7 @@
               console.log(error);
             });
         },
-        showEditor(name) {
+        showProjectEditor(name) {
           $('#editorModal').modal('show');
           this.editorModal.mode = name === '' ? 'add' : 'edit';
           this.editorModal.name = '';
@@ -261,6 +274,28 @@
             .catch(error => {
               console.log(error);
             });
+        },
+        loadGlobalDeps() {
+          axios.get(`/api/global-deps`)
+          .then(response => {
+            this.globalDepsPanel.content = response.data.content;
+          })
+          .catch(error => {
+            console.log(error);
+          });
+        },
+        saveGlobalDeps() {
+          this.globalDepsPanel.saving = true;
+          axios.post(`/api/global-deps`, {
+            content: this.globalDepsPanel.content.trim()
+          }).then(response => {
+            this.globalDepsPanel.saving = false;
+            this.loadGlobalDeps();
+          })
+          .catch(error => {
+            this.globalDepsPanel.saving = false;
+            console.log(error);
+          });
         },
         deleteProject() {
           let r = confirm('确认删除吗？删除后将不可恢复！');
@@ -299,7 +334,6 @@
           let actionProjects = this.actionNpmInstallModal.projects
             .filter(item => item.checked === true)
             .map(item => item.name);
-          console.log(actionProjects);
           axios.post(`/api/start_tasks`, {
             projects: actionProjects
           }).then(response => {
@@ -307,6 +341,16 @@
             this.taskId = id;
             this.loadResult(this.taskId);
             this.closeActionNpmInstall();
+          })
+          .catch(error => {
+            console.log(error);
+          });
+        },
+        actionGlobalDeps() {
+          axios.post(`/api/start_global_deps`, {}).then(response => {
+            let id = response.data.id;
+            this.taskId = id;
+            this.loadResult(this.taskId);
           })
           .catch(error => {
             console.log(error);
@@ -340,6 +384,7 @@
       },
       mounted() {
         this.loadProjects();
+        this.loadGlobalDeps();
         this.loadDownloadFileList();
       },
       computed: {
