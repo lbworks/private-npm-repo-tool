@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -v
 # Copyright 2021 baiziyu
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,15 +23,12 @@ if [[ -f $GLOBAL_DEPS_PATH ]]; then
   do
   echo "============================== $line begin =============================="
   package=$(expr "$line" : "\(.*\)@.*")
-  echo $package
-  echo "npm uninstall -g $package"
   npm uninstall -g $package
-  echo "npm cache clean -f"
+  rm -rf /lib/node_modules/.staging/
   npm cache clean -f
-  echo "npm cache verify"
   npm cache verify
-  echo "npm install -g $line --registry=$1"
   npm install -g $line --registry=$1
+  npm uninstall -g $package
   echo "============================== $line end =============================="
   done < $GLOBAL_DEPS_PATH
 fi

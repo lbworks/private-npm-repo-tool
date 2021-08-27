@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -v
 # Copyright 2021 baiziyu
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
