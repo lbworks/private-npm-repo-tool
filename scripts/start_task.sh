@@ -1,4 +1,4 @@
-#!/bin/bash -v
+#!/bin/bash
 # Copyright 2021 baiziyu
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+set -x
 
 SCRIPT_DIR=$(cd $(dirname "$0") && pwd)
 
@@ -20,6 +21,8 @@ dir="$SCRIPT_DIR/../resources/projects/$project"
 if [ -d ${dir} ];
 then
   echo "============================== $project begin =============================="
+  node -v
+  npm -v
   cd "$dir"
   npm cache clean -f
   npm cache verify

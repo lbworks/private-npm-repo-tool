@@ -199,15 +199,15 @@ app.get('/api/listStorageTarball', (req, res, next) => {
 });
 
 function startTasks(id, projects) {
-  exec(`nohup ./scripts/start_tasks.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} ${projects.join(' ')} > ./resources/tasks/${id}.log &`);
+  exec(`nohup ./scripts/start_tasks.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} ${projects.join(' ')} > ./resources/tasks/${id}.log 2>&1 &`);
 }
 
 function startAllTasks(id) {
-  exec(`nohup ./scripts/start_all_tasks.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log &`);
+  exec(`nohup ./scripts/start_all_tasks.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log 2>&1 &`);
 }
 
 function startGlobalDesp(id) {
-  exec(`nohup ./scripts/start_global_deps.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log &`);
+  exec(`nohup ./scripts/start_global_deps.sh http://${process.env.VERDACCIO_SERVER_HOSTNAME}:${process.env.VERDACCIO_PORT} > ./resources/tasks/${id}.log 2>&1 &`);
 }
 
 server.listen(port, '0.0.0.0', () => {
